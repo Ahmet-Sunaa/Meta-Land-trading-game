@@ -1,0 +1,1737 @@
+import sys
+
+from PyQt6 import QtCore, QtGui, QtWidgets, uic
+from PyQt6.QtCore import QSize
+from PyQt6.QtWidgets import QPushButton, QTextBrowser
+
+from users import arsa, item, market, real_estate
+from database import database
+from manager import admin
+
+
+class find_job_window(QtWidgets.QMainWindow):
+    game_area_info = None
+    game_area_size = None
+    uid = None
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setMinimumSize(QSize(420, 150))
+
+        identity = 1
+        place_x = 0
+        place_y = 0
+        area = database.get_area(self.uid[0])
+        for i in range(int(len(area))):
+            buton_text = "id: " + str(area[i][0]) + " Türü: " + str(area[i][1]) + " Maaş: " + str(area[i][2])
+            buton_tooltip = "id: " + str(area[i][3]) + " Sahibi: " + str(area[i][4]) + " " + str(area[i][5])
+            button = QPushButton(buton_text, self, objectName=str(area[i][0]))
+            button.clicked.connect(self.job_accept)
+            button.setToolTip(buton_tooltip)
+            button.resize(200, 30)
+            button.move(place_x, place_y)
+            place_y += 30
+            identity += 1
+
+    def job_accept(self):
+        sender = self.sender()
+        self.job_details(sender.objectName())
+
+    def job_details(self, bid):
+        button = QPushButton('accept job id:'+str(bid), self,objectName=str(bid))
+        button.resize(100, 30)
+        button.move(200, 0)
+        button.clicked.connect(self.job_entry)
+        button.show()
+    def job_entry(self):
+        sender = self.sender()
+        database.set_find_job(sender.objectName(),self.uid)
+
+        #text_browser.setText(str(bid))
+
+
+class UserWindow(QtWidgets.QMainWindow):
+    uid = None
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        uic.loadUi("./user_windows/map.ui", self)
+        self.setWindowTitle("Kullanıcı")
+        data = database.getIMF(self.uid[0])
+        self.food_label.setText(data[0])
+        self.item_label.setText(data[1])
+        self.money_label.setText(data[2])
+        self.job_button.clicked.connect(self.find_job)
+        game_area = database.get_game_area()
+        self.send_game_area = int(game_area[0]) * int(game_area[1])
+        identity = 1
+        for i in range(int(game_area[0])):
+            for j in range(int(game_area[1])):
+                area_data = database.get_area_type(str(identity))
+                button = QPushButton('', self, objectName=str(identity))
+                button.resize(80, 80)
+                button.clicked.connect(self.get_areas)
+                button.move(80 * (j + 1), 80 * (i + 1))
+                if area_data[0][1] == '1':
+                    button.setIcon(QtGui.QIcon('./icons/ev.png'))
+                    button.setIconSize(QtCore.QSize(70, 70))
+                elif area_data[0][1] == '2':
+                    button.setIcon(QtGui.QIcon('./icons/market.png'))
+                    button.setIconSize(QtCore.QSize(70, 70))
+                elif area_data[0][1] == '3':
+                    button.setIcon(QtGui.QIcon('./icons/esya.png'))
+                    button.setIconSize(QtCore.QSize(70, 70))
+                else:
+                    button.setIcon(QtGui.QIcon('./icons/arsa.png'))
+                    button.setIconSize(QtCore.QSize(70, 70))
+                button.setToolTip(database.get_area_owner_tooltip(str(identity)))
+                identity += 1
+
+    def get_areas(self, clicked):
+        sender = self.sender()
+        checker = database.get_area_type(str(sender.objectName()))
+        if checker[0][1] == '1':
+            real_estate.MainWindow.emlak_id = sender.objectName()
+            real_estate.MainWindow.uid = self.uid
+            real_estate.MainWindow.game_area_info = checker[0]
+            real_estate.MainWindow.game_area = self.send_game_area
+            window_shop = real_estate.MainWindow(self)
+            window_shop.show()
+        elif checker[0][1] == '2':
+            market.MainWindow.uid = self.uid
+            market.MainWindow.game_area_info = checker[0]
+            window_shop = market.MainWindow(self)
+            window_shop.show()
+        elif checker[0][1] == '3':
+            item.MainWindow.uid = self.uid
+            item.MainWindow.game_area_info = checker[0]
+            window_shop = item.MainWindow(self)
+            window_shop.show()
+        else:
+            arsa.MainWindow.bid = sender.objectName()
+            arsa.MainWindow.uid = self.uid
+            arsa.MainWindow.game_area_info = checker[0]
+            window_shop = arsa.MainWindow(self)
+            window_shop.show()
+
+        return database.get_area_type(str(sender.objectName()))
+
+    def find_job(self):
+        find_job_window.uid = self.uid
+        self.window = find_job_window(self)
+        self.window.show()
+
+
+class MainWindow(QtWidgets.QMainWindow):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        uic.loadUi("./user_windows/user_entry.ui", self)
+        self.setWindowTitle("Login")
+        self.user_entry.clicked.connect(self.user_login)
+        self.manager_entry.clicked.connect(self.manager_login)
+        self.register_button.clicked.connect(self.register_buton)
+
+    def user_login(self):
+        tf_checker = database.login(self.name_line.text(), self.surname_line.text(), self.pasword_line.text())
+        if tf_checker[1]:
+            UserWindow.uid = tf_checker[0]
+            user_window = UserWindow(self)
+            user_window.show()
+
+    def manager_login(self):
+        tf_checker = database.manager_login(self.name_line.text(), self.surname_line.text(), self.pasword_line.text())
+        if tf_checker[1]:
+            manager_window = admin.MainWindow(self)
+            manager_window.show()
+
+    def register_buton(self):
+        database.register(self.name_line.text(), self.surname_line.text(), self.pasword_line.text())
+
+
+if __name__ == "__main__":
+    app = QtWidgets.QApplication(sys.argv)
+    window = MainWindow()
+    window.resize(300, 200)
+    window.show()
+    app.exec()
+from PyQt6 import QtCore, QtGui, QtWidgets, uic
+import sys
+
+from PyQt6.QtCore import QSize, QObjectCleanupHandler
+from PyQt6.QtWidgets import QPushButton
+
+from database import database
+
+from manager.admin_database import database as d
+from manager import real_estate as a_real_estate
+
+class MainWindow(QtWidgets.QMainWindow):
+    game_area_info = None
+    game_area = None
+    uid = None
+    emlak_id = None
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        uic.loadUi("./user_windows/emlak.ui", self)
+        self.setWindowTitle("Emlak")
+
+        if str(self.uid[0]) == str(self.game_area_info[2]):
+            button = QPushButton('Güncelleme Sayfası', self, objectName=str('update'))
+            button.clicked.connect(self.update_page)
+            button.resize(150, 30)
+            button.move(400, 0)
+        name = database.get_area_owner(self.game_area_info[0])
+        self.business_owner.setText(name)
+        salary = database.get_shop_salary(self.game_area_info[0])
+        self.daily_salary.setText(salary[0])
+        identity = 1
+        place_x = 0
+        place_y = 100
+
+        for i in range(int(self.game_area)):
+            area = d.get_area(identity)
+            if area[4] == str(self.uid[0]):
+                if identity == 10:
+                    place_x += 150
+                    place_y = 100
+                identity += 1
+                continue
+            buton_text = area[0] + " " + area[1] + " id:" + str(area[2]) + " " + area[3]
+            button = QPushButton(buton_text, self, objectName=str(identity))
+            button.clicked.connect(self.get_areas)
+            button.resize(150, 30)
+            button.move(place_x, place_y)
+            place_y += 30
+            identity += 1
+            if (identity - 1) % 10 == 0:
+                place_x += 150
+                place_y = 100
+        land_info = database.get_owner_land(self.uid[0])
+        self.iskur_label = QtWidgets.QLabel('İş kurulabilecek Arsalarınız:', self)
+        self.iskur_label.move(400, 50)
+        self.iskur_label.resize(200, 20)
+        place_x = 400
+        place_y = 70
+        for i in land_info:
+            buton_text = str(i[0])+" id numaralı arsanız"
+            button = QPushButton(buton_text, self, objectName=str(int(i[0])*30))
+            button.clicked.connect(self.business_button)
+            button.resize(150, 30)
+            button.move(place_x, place_y)
+            place_y += 30
+
+
+    def get_areas(self, clicked):
+        sender = self.sender()
+        emlak_satis_kiralik_window.bid = sender.objectName()
+        emlak_satis_kiralik_window.uid = self.uid
+        emlak_satis_kiralik_window.emlak_id = self.emlak_id
+        self.window = emlak_satis_kiralik_window(self)
+        self.window.show()
+
+
+    def business_button(self):
+        sender = self.sender()
+        build_business_window.uid = self.uid
+        build_business_window.bid = str(int(int(sender.objectName())/30))
+        self.window = build_business_window(self)
+        self.window.show()
+
+    def update_page(self):
+        a_real_estate.MainWindow.user = int(self.uid[0])
+        a_real_estate.MainWindow.uid = self.game_area_info
+        a_real_estate.MainWindow.game_area = self.game_area
+        window_shop = a_real_estate.MainWindow(self)
+        window_shop.show()
+
+class emlak_satis_kiralik_window(QtWidgets.QMainWindow):
+    bid = None
+    type_business = None
+    uid = None
+    emlak_id = None
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setMinimumSize(QSize(420, 150))
+        buy_button = QPushButton('Satın Al', self, objectName='sold')
+        buy_button.clicked.connect(self.buy)
+        buy_button.resize(75, 30)
+        buy_button.move(0, 50)
+
+        rent_button = QPushButton('Kirala', self, objectName='rent')
+        rent_button.clicked.connect(self.rent)
+        rent_button.resize(75, 30)
+        rent_button.move(75, 50)
+        self.rent_days = QtWidgets.QLineEdit(self)
+        self.rent_days.setText('0')
+        self.rent_days.move(150, 50)
+
+        label1 = QtWidgets.QLabel(self)
+
+        label2 = QtWidgets.QLabel(self)
+        label2.move(85, 0)
+
+        label3 = QtWidgets.QLabel(self)
+        label3.move(0, 25)
+
+        label4 = QtWidgets.QLabel(self)
+        label4.move(85, 25)
+
+        label1.setText('Satış Fiyatı: ')
+
+        label3.setText('Kiralama Fiyatı:')
+
+        price = d.get_emlak_rent_sold_price(self.bid)
+        self.type_business = price[2]
+        if price[2] != '4':
+            label2.setText(str(price[0]))
+            label4.setText(str(price[1]))
+        else:
+            QObjectCleanupHandler().add(label3)
+            QObjectCleanupHandler().add(label4)
+            QObjectCleanupHandler().add(rent_button)
+            label2.setText(str(price[0]))
+    def buy(self):
+        sender = self.sender()
+        database.set_rent_sold(self.bid, sender.objectName(), self.uid[0], emlak_id=self.emlak_id)# satın alma tamamlandıı kiralamayı yapppppp Kulanıcının işletme almasını kontrol etttttttttttttttttt
+
+    def rent(self):
+        sender = self.sender()
+        day = self.rent_days.text()
+        cnx=database.connecter()
+        cursor = cnx.cursor()
+        cursor.execute(
+            "select area_users_id from game_area where idgame_area=%s",
+            (self.bid,))
+        owner = cursor.fetchall()
+        database.set_rent_sold(self.bid, sender.objectName(), self.uid[0], days=day, emlak_id=self.emlak_id, owner=owner[0][0])#kirayı halleeeeeeet
+
+
+class build_business_window(QtWidgets.QMainWindow):
+    bid = None
+    uid = None
+    emlak_id = 1
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setMinimumSize(QSize(420, 150))
+        buy_button = QPushButton('Satın Al', self, objectName='sold')
+        buy_button.clicked.connect(self.buy)
+        buy_button.resize(75, 30)
+        buy_button.move(0, 50)
+
+        self.groupbox = QtWidgets.QComboBox(self)
+        self.groupbox.addItem('emlak')
+        self.groupbox.addItem('market')
+        self.groupbox.addItem('magaza')
+        self.groupbox.activated.connect(self.change_price)
+        self.label4 = QtWidgets.QLabel(self)
+        self.label4.move(120, 0)
+        self.label4.setText(database.get_build_business_price(self.groupbox.currentText()))
+
+
+    def buy(self):
+        sender = self.sender()
+        database.set_build_business(self.uid[0], self.bid, self.emlak_id, self.groupbox.currentText(), self.label4.text()) #iş kurma bitti ancak kullanıcının kendi iş yerine bilgi ayarlama getirrrrrrrrrrrrrrrrrr
+
+    def change_price(self):
+        self.label4.setText(database.get_build_business_price(self.groupbox.currentText()))
+
+if __name__ == "__main__":
+    app = QtWidgets.QApplication(sys.argv)
+    window = MainWindow()
+    window.resize(300, 200)
+    window.show()
+    app.exec()
+from PyQt6 import QtCore, QtGui, QtWidgets, uic
+import sys
+
+from PyQt6.QtWidgets import QPushButton
+
+from database import database
+from manager import market as a_market
+
+class MainWindow(QtWidgets.QMainWindow):
+    game_area_info = None
+    uid = None
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        uic.loadUi("./user_windows/market.ui", self)
+        self.setWindowTitle("Market")
+        if str(self.uid[0]) == str(self.game_area_info[2]):
+            button = QPushButton('Güncelleme Sayfası', self, objectName=str('update'))
+            button.clicked.connect(self.update_page)
+            button.resize(150, 30)
+            button.move(10, 130)
+        name = database.get_area_owner(self.game_area_info[0])
+        self.business_owner.setText(name)
+        food_cost = database.get_shop_price(self.game_area_info[0])
+        self.food_coast.setText(food_cost[0])
+        salary = database.get_shop_salary(self.game_area_info[0])
+        self.daily_salary.setText(salary[0])
+        self.buy_button.clicked.connect(self.buy_food)
+
+    def buy_food(self):
+        buy_count = self.food_count.text()
+        database.buy_food_item(self.uid[0], buy_count, self.game_area_info)
+
+    def update_page(self):
+        a_market.MainWindow.uid = self.game_area_info
+        window_shop = a_market.MainWindow(self)
+        window_shop.show()
+
+if __name__ == "__main__":
+    app = QtWidgets.QApplication(sys.argv)
+    window = MainWindow()
+    window.resize(300, 200)
+    window.show()
+    app.exec()
+from PyQt6 import QtCore, QtGui, QtWidgets, uic
+import sys
+
+from PyQt6.QtWidgets import QPushButton
+
+from database import database
+from manager import item_shop
+class MainWindow(QtWidgets.QMainWindow):
+    game_area_info = None
+    uid = None
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        uic.loadUi("./user_windows/esya.ui", self)
+        self.setWindowTitle("Eşya")
+        name = database.get_area_owner(self.game_area_info[0])
+        self.business_owner.setText(name)
+        item_cost = database.get_shop_price(self.game_area_info[0])
+        self.item_coast.setText(item_cost[0])
+        salary = database.get_shop_salary(self.game_area_info[0])
+        self.daily_salary.setText(salary[0])
+        self.buy_button.clicked.connect(self.buy_food)
+        if str(self.uid[0]) == str(self.game_area_info[2]):
+            button = QPushButton('Güncelleme Sayfası', self, objectName=str('update'))
+            button.clicked.connect(self.update_page)
+            button.resize(150, 30)
+            button.move(10, 120)
+    def buy_food(self):
+        buy_count = self.item_count.text()
+        database.buy_food_item(self.uid[0], buy_count, self.game_area_info)
+
+    def update_page(self):
+        item_shop.MainWindow.uid = self.game_area_info
+        window_shop = item_shop.MainWindow(self)
+        window_shop.show()
+
+if __name__ == "__main__":
+    app = QtWidgets.QApplication(sys.argv)
+    window = MainWindow()
+    window.resize(80, 80)
+    window.show()
+    app.exec()
+from PyQt6 import QtCore, QtGui, QtWidgets, uic
+import sys
+
+from PyQt6.QtCore import QObjectCleanupHandler, QSize
+from PyQt6.QtWidgets import QPushButton
+
+from database import database
+
+
+class MainWindow(QtWidgets.QMainWindow):
+    game_area_info = None
+    uid = None
+    bid = None
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        uic.loadUi("./user_windows/arsa.ui", self)
+        self.setWindowTitle("Arsa")
+        if int(self.uid[0]) == int(self.game_area_info[2]):
+            name = database.get_area_owner(self.game_area_info[0])
+            self.owner.setText(name)
+
+            business_price = database.get_sold_business(self.game_area_info[0])
+            self.textLine = QtWidgets.QLineEdit(self, objectName='sold')
+            self.textLine.setText(business_price[0])
+            self.textLine.move(100, 30)
+            self.textLine.show()
+
+            button = QtWidgets.QPushButton('Güncelle', self)
+            button.resize(100, 30)
+            button.move(0, 70)
+            button.clicked.connect(self.upgrades)
+
+
+            QObjectCleanupHandler().add(self.price)
+            # self.price.setText(business_price[0])
+        else:
+            name = database.get_area_owner(self.game_area_info[0])
+            self.owner.setText(name)
+            business_price = database.get_sold_business(self.game_area_info[0])
+            self.price.setText(business_price[0])
+
+    def upgrades(self):
+        sold_price = self.textLine.text()
+        database.set_emlak_rent_sold_price(self.bid, sold_price, 9999)
+
+
+if __name__ == "__main__":
+    app = QtWidgets.QApplication(sys.argv)
+    window = MainWindow()
+    window.resize(80, 80)
+    window.show()
+    app.exec()
+
+from PyQt6 import QtCore, QtGui, QtWidgets, uic
+import sys
+
+from PyQt6.QtCore import QObjectCleanupHandler
+from PyQt6.QtWidgets import QPushButton
+
+from manager.admin_database import database
+
+class MainWindow(QtWidgets.QMainWindow):
+    uid = None
+    game_area = None
+    user = None
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        uic.loadUi("./admin_windows/emlak.ui", self)
+        self.setWindowTitle("Emlak")
+        owner_data = database.get_area_owner(self.uid[2])
+        name = owner_data[0][0] + " " + owner_data[0][1]
+        self.owner.setText(name)
+        owner_data = database.get_cost(self.uid[2], self.uid[0])
+        self.salary.setText(str(owner_data[0][0]))
+        commission = database.get_emlak_commission(self.uid[0])
+        self.sold_commission.setText(commission[0])
+        self.rent_commission.setText(commission[1])
+        print(owner_data)
+        self.sold.setText(owner_data[1][0])
+        self.rent.setText(owner_data[1][1])
+
+        self.upgrade.clicked.connect(self.upgrades)
+        if int(self.user) == 1:
+            identity = 1
+            place_x = 0
+            place_y = 100
+
+            for i in range(int(self.game_area)):
+                area = database.get_area(identity)
+                buton_text = area[0] + " " + area[1] + " id:" + str(area[2]) + " " + area[3]
+                button = QPushButton(buton_text, self, objectName=str(identity))
+                button.clicked.connect(self.get_areas)
+                button.resize(150, 30)
+                button.move(place_x, place_y)
+                place_y += 30
+                identity += 1
+                if (identity - 1) % 10 == 0:
+                    place_x += 150
+                    place_y = 100
+        else:
+            identity = 1
+            place_x = 0
+            place_y = 100
+
+            for i in range(int(self.game_area)):
+                area = database.get_area(identity)
+                if str(area[4])==str(self.uid[2]):
+                    buton_text = area[0] + " " + area[1] + " id:" + str(area[2]) + " " + area[3]
+                    button = QPushButton(buton_text, self, objectName=str(identity))
+                    button.clicked.connect(self.get_areas)
+                    button.resize(150, 30)
+                    button.move(place_x, place_y)
+                    place_y += 30
+                    if (identity - 1) % 10 == 0:
+                        place_x += 150
+                        place_y = 100
+                identity += 1
+
+    def get_areas(self, clicked):
+        sender = self.sender()
+        EmlakWindow.bid = sender.objectName()
+        self.window = EmlakWindow(self)
+        self.window.show()
+
+    def upgrades(self):
+        salarys = self.salary.text()
+        database.set_cost(self.uid[2], self.uid[0], salarys, 0, self.sold.text(), self.rent.text())
+        sold_c = self.sold_commission.text()
+        rent_c = self.rent_commission.text()
+        database.set_emlak_commission(sold_c, rent_c, self.uid[0], self.uid[2])
+
+class EmlakWindow(QtWidgets.QMainWindow):
+    bid = None
+    type_business = None
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        uic.loadUi("./admin_windows/emlak_satis_kiralik.ui", self)
+        self.setWindowTitle("Emlak")
+        price = database.get_emlak_rent_sold_price(self.bid)
+        self.type_business = price[2]
+        if price[2] != '4':
+            self.sold.setText(str(price[0]))
+            self.rent.setText(str(price[1]))
+        else:
+            QObjectCleanupHandler().add(self.rent)
+            QObjectCleanupHandler().add(self.label_2)
+            self.sold.setText(str(price[0]))
+        self.upgrade.clicked.connect(self.upgrades)
+
+    def upgrades(self):
+        if self.type_business != '4':
+            sold_price = self.sold.text()
+            rent_price = self.rent.text()
+            database.set_emlak_rent_sold_price(self.bid, sold_price, rent_price)
+        else:
+            sold_price = self.sold.text()
+            database.set_emlak_rent_sold_price(self.bid, sold_price, 9999)
+
+
+if __name__ == "__main__":
+    app = QtWidgets.QApplication(sys.argv)
+    window = MainWindow()
+    window.resize(300, 200)
+    window.show()
+    app.exec()
+from PyQt6 import QtCore, QtGui, QtWidgets, uic
+import sys
+from manager.admin_database import database
+
+class MainWindow(QtWidgets.QMainWindow):
+    uid = None
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        uic.loadUi("./admin_windows/market.ui", self)
+        self.setWindowTitle("Market")
+        owner_data = database.get_area_owner(self.uid[2])
+        name = owner_data[0][0]+" "+owner_data[0][1]
+        self.owner.setText(name)
+        owner_data = database.get_cost(self.uid[2], self.uid[0])
+        self.coast.setText(owner_data[0][0])
+        self.salary.setText(owner_data[1][0])
+        self.sold_price.setText(owner_data[2][0])
+        self.rent_price.setText(owner_data[2][1])
+        self.upgrade.clicked.connect(self.upgrades)
+
+    def upgrades(self):
+        cost = self.coast.text()
+        salarys = self.salary.text()
+        sold = self.sold_price.text()
+        rent = self.rent_price.text()
+        database.set_cost(self.uid[2], self.uid[0], salarys, cost, sold, rent)
+
+
+if __name__ == "__main__":
+    app = QtWidgets.QApplication(sys.argv)
+    window = MainWindow()
+    window.resize(300, 200)
+    window.show()
+    app.exec()
+from PyQt6 import QtCore, QtGui, QtWidgets, uic
+import sys
+
+from manager.admin_database import database
+
+
+class MainWindow(QtWidgets.QMainWindow):
+    uid = None
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        uic.loadUi("./admin_windows/esya.ui", self)
+        self.setWindowTitle("Eşya")
+        owner_data = database.get_area_owner(self.uid[2])
+        name = owner_data[0][0] + " " + owner_data[0][1]
+        self.owner.setText(name)
+        owner_data = database.get_cost(self.uid[2], self.uid[0])
+        self.coast.setText(owner_data[0][0])
+        self.salary.setText(owner_data[1][0])
+        self.sold_price.setText(owner_data[2][0])
+        self.rent_price.setText(owner_data[2][1])
+        self.upgrade.clicked.connect(self.upgrades)
+
+    def upgrades(self):
+        cost = self.coast.text()
+        salarys = self.salary.text()
+        sold = self.sold_price.text()
+        rent = self.rent_price.text()
+        database.set_cost(self.uid[2], self.uid[0], salarys, cost, sold, rent)
+
+if __name__ == "__main__":
+    app = QtWidgets.QApplication(sys.argv)
+    window = MainWindow()
+    window.resize(300, 200)
+    window.show()
+    app.exec()
+
+
+from PyQt6 import QtCore, QtGui, QtWidgets, uic
+import sys
+from manager.admin_database import database
+
+
+class MainWindow(QtWidgets.QMainWindow):
+    uid = None
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        uic.loadUi("./admin_windows/arsa.ui", self)
+        self.setWindowTitle("Arsa")
+        owner_data = database.get_area_owner(self.uid[2])
+        name = owner_data[0][0] + " " + owner_data[0][1]
+        self.owner.setText(name)
+        owner_data = database.get_emlak_rent_sold_price(self.uid[0])
+        self.price.setText(owner_data[0])
+        self.upgrade.clicked.connect(self.upgrades)
+
+    def upgrades(self):
+        sold_price = self.price.text()
+        database.set_emlak_rent_sold_price(self.uid[0], sold_price, 9999)
+
+if __name__ == "__main__":
+    app = QtWidgets.QApplication(sys.argv)
+    window = MainWindow()
+    window.resize(300, 200)
+    window.show()
+    app.exec()
+
+import sys
+
+from PyQt6 import QtCore, QtGui, QtWidgets, uic
+from PyQt6.QtWidgets import QPushButton, QTableWidgetItem
+
+from manager import item_shop, arsa, market, real_estate
+from database import database
+
+from manager.admin_database import database as d
+
+class MainWindow(QtWidgets.QMainWindow):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.total_property = database.get_all_property()
+        uic.loadUi("./admin_windows/manager_window.ui", self)
+        self.setWindowTitle("Yönetici")
+        row = 0
+        self.ownered_by_admin.setRowCount(len(self.total_property))
+        for i in self.total_property:
+            self.ownered_by_admin.setItem(row, 0, QTableWidgetItem(str(i[0])))
+            self.ownered_by_admin.setItem(row, 1, QTableWidgetItem(str(i[1])))
+            self.ownered_by_admin.setItem(row, 2, QTableWidgetItem(str(i[2])))
+            self.ownered_by_admin.setItem(row, 3, QTableWidgetItem(str(i[3])))
+            self.ownered_by_admin.setItem(row, 4, QTableWidgetItem(str(i[4])))
+            row+=1
+        self.upgrade_button.clicked.connect(self.upgrade_starter)
+        self.daily_upgrade_button.clicked.connect(self.upgrade_daily)
+        self.map_buton.clicked.connect(self.open_map)
+        self.Build_upgrade_button.clicked.connect(self.build_upgrade)
+        self.level_upgrade_button.clicked.connect(self.level_upgrade)
+        button = QtWidgets.QPushButton('Database sıfırlama', self, objectName='delete_database')
+        button.resize(120, 30)
+        button.clicked.connect(self.database_deleted)
+        button.move(10, 550)
+
+
+
+    def upgrade_starter(self):
+        food = self.food.text()
+        money = self.money.text()
+        items = self.item.text()
+        area_size = self.area_size.text()
+        shop_salary = self.shop_salary.text()
+        item_salary = self.item_salary.text()
+        emlak_salary = self.emlak_salary.text()
+        food_price = self.food_price.text()
+        item_price = self.item_price.text()
+        database.manager_upgrade_starter(items, money, food, area_size, shop_salary, item_salary, emlak_salary,
+                                         food_price, item_price)
+
+    def upgrade_daily(self):
+        food = self.daily_food.text()
+        money = self.daily_money.text()
+        item = self.daily_item.text()
+        database.manager_upgrade_daily(item, money, food)
+
+    def build_upgrade(self):
+        market_price = self.market_text.text()
+        emlak_price = self.emlak_text.text()
+        supermarket_price = self.supermarket_text.text()
+        database.manager_upgrade_build_cost(market_price, supermarket_price, emlak_price)
+
+    def level_upgrade(self):
+        first = self.first_text.text()
+        second = self.second_text.text()
+        third = self.third_text.text()
+        database.manager_upgrade_level_cost(first, second, third)
+
+    def database_deleted(self):
+        d.deleted_database()
+
+    def open_map(self):
+        new_window = map(self)
+        new_window.show()
+
+class map(QtWidgets.QMainWindow):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        uic.loadUi("./admin_windows/map.ui", self)
+        self.setWindowTitle("Yönetici Map")
+        self.game_area = database.get_game_area()
+        identity = 1
+        for i in range(int(self.game_area[0])):
+            for j in range(int(self.game_area[1])):
+                area_data = database.get_area_type(str(identity))
+                button = QPushButton('', self, objectName=str(identity))
+                button.resize(80, 80)
+                button.clicked.connect(self.get_areas)
+                button.move(80 * (j + 1), 80 * (i + 1))
+                if area_data[0][1] == '1':
+                    button.setIcon(QtGui.QIcon('./icons/ev.png'))
+                    button.setIconSize(QtCore.QSize(70, 70))
+                elif area_data[0][1] == '2':
+                    button.setIcon(QtGui.QIcon('./icons/market.png'))
+                    button.setIconSize(QtCore.QSize(70, 70))
+                elif area_data[0][1] == '3':
+                    button.setIcon(QtGui.QIcon('./icons/esya.png'))
+                    button.setIconSize(QtCore.QSize(70, 70))
+                else:
+                    button.setIcon(QtGui.QIcon('./icons/arsa.png'))
+                    button.setIconSize(QtCore.QSize(70, 70))
+                button.setToolTip(database.get_area_owner(str(identity)))
+                identity += 1
+
+    def get_areas(self, clicked):
+        sender = self.sender()
+        checker = database.get_area_type(str(sender.objectName()))
+        if checker[0][1] == '1':
+            real_estate.MainWindow.user = 1
+            real_estate.MainWindow.game_area = int(self.game_area[0])*int(self.game_area[1])
+            real_estate.MainWindow.uid = checker[0]
+            window_shop = real_estate.MainWindow(self)
+            window_shop.show()
+        elif checker[0][1] == '2':
+            market.MainWindow.uid = checker[0] ######market bitiiiiiiiiiiiiiiiiiiiiiiiiiii diğerlerini de yapppppppp
+            window_shop = market.MainWindow(self)
+            window_shop.show()
+        elif checker[0][1] == '3':
+            item_shop.MainWindow.uid = checker[0]
+            window_shop = item_shop.MainWindow(self)
+            window_shop.show()
+        else:
+            arsa.MainWindow.uid = checker[0]
+            window_shop = arsa.MainWindow(self)
+            window_shop.show()
+
+
+if __name__ == "__main__":
+    app = QtWidgets.QApplication(sys.argv)
+    window = MainWindow()
+    window.resize(80, 80)
+    window.show()
+    app.exec()
+import mysql.connector
+
+
+class database:
+    pass
+
+
+def connecter():
+    cnx = mysql.connector.connect(user='root', password='18436572',
+                                  host='127.0.0.1',
+                                  database='prolab')
+    return cnx
+
+
+def deleted_database():
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        cursor.execute("TRUNCATE TABLE users")
+        cursor.execute("TRUNCATE TABLE sold")
+        cursor.execute("TRUNCATE TABLE rent")
+        cursor.execute("TRUNCATE TABLE show_coast")
+        cursor.execute("TRUNCATE TABLE komisyon")
+        cursor.execute("TRUNCATE TABLE game_area")
+        cursor.execute("TRUNCATE TABLE emlak_cost")
+        cursor.execute("TRUNCATE TABLE daily_coast")
+        cursor.execute("TRUNCATE TABLE business_salary")
+        cursor.execute("TRUNCATE TABLE business")
+        cursor.execute("TRUNCATE TABLE busines_start")
+        cnx.commit()
+        cursor.execute("""UPDATE type_business SET build_cost=%s""",
+                       (0,))
+        cursor.execute("""
+                  UPDATE start
+                  SET start_item=%s, start_money=%s, start_food=%s, game_size=%s
+                  where idstart=%s
+               """, (0, 0, 0, '0x0', 1))
+        cursor.execute(
+            "INSERT INTO users (id_user, name, surname, password, food, item, money, starting_time) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+            (1, 'admin', 'admin', 'admin', 999999, 999999, 999999, 999999))
+        cursor.execute(
+            "INSERT INTO komisyon (id_emlak, emlak_satis_komisyon, emlak_kiralama_komisyon, id_user) VALUES (%s, %s, %s, %s)",
+            (1, 0, 0, 1))
+        cursor.execute(
+            "INSERT INTO daily_coast (iddaily_coast, food, money, item) VALUES (%s, %s, %s, %s)",
+            (1, 0, 0, 0))
+        cursor.execute(
+            "INSERT INTO business_salary (idbusiness_salary, salary, owner_id, business_level_oran) VALUES (%s, %s, %s ,%s)",
+            (1, 0, 1, 3))
+        cursor.execute(
+            "INSERT INTO business_salary (idbusiness_salary, salary, owner_id, business_level_oran) VALUES (%s, %s, %s ,%s)",
+            (2, 0, 1, 3))
+        cursor.execute(
+            "INSERT INTO business_salary (idbusiness_salary, salary, owner_id, business_level_oran) VALUES (%s, %s, %s ,%s)",
+            (3, 0, 1, 3))
+        cursor.execute(
+            "INSERT INTO business (idbusiness, level, capacity, total_worker, id_owner) VALUES (%s, %s, %s, %s, %s)",
+            (1, 3, 99, 0, 1))
+        cursor.execute(
+            "INSERT INTO business (idbusiness, level, capacity, total_worker, id_owner) VALUES (%s, %s, %s, %s, %s)",
+            (2, 3, 99, 0, 1))
+        cursor.execute(
+            "INSERT INTO business (idbusiness, level, capacity, total_worker, id_owner) VALUES (%s, %s, %s, %s, %s)",
+            (3, 3, 99, 0, 1))
+        cnx.commit()
+        cursor.close()
+        cnx.close()
+
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
+def get_area_owner(aid):
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        cursor.execute("select name, surname from users where id_user=%s", (aid,))
+        user = cursor.fetchall()
+        cursor.close()
+        cnx.close()
+        return user
+
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
+def get_cost(uid, bid):
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        cursor.execute("select type_area from game_area where idgame_area=%s", (bid,))
+        type_area = cursor.fetchall()
+        if type_area[0][0] != '1':
+            cursor.execute("select cost from show_coast where id_owner=%s and id_shop_cost=%s", (uid, bid))
+            cost = cursor.fetchall()
+            cursor.execute("select salary from business_salary where owner_id=%s and idbusiness_salary=%s", (uid, bid))
+            salary = cursor.fetchall()
+            cursor.execute("select sold_price, rent_price from emlak_cost where owner_id=%s and business_id=%s", (uid, bid))
+            business_price = cursor.fetchall()
+            cursor.close()
+            cnx.close()
+            return [cost[0], salary[0], business_price[0]]
+
+        else:
+            cursor.execute("select salary from business_salary where owner_id=%s and idbusiness_salary=%s", (uid, bid))
+            salary = cursor.fetchall()
+            cursor.execute("select sold_price, rent_price from emlak_cost where owner_id=%s and business_id=%s",
+                           (uid, bid))
+            business_price = cursor.fetchall()
+            cursor.close()
+            cnx.close()
+            return [salary[0], business_price[0]]
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
+def get_area(bid):
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        cursor.execute(
+            "SELECT u.name, u.surname, g.idgame_area,t.type,g.area_users_id FROM game_area as g INNER JOIN users as u ON u.id_user=g.area_users_id and g.idgame_area=%s INNER JOIN type_business as t ON g.type_area = t.idtype_business",
+            (bid,))
+        user = cursor.fetchall()
+        cursor.close()
+        cnx.close()
+        return user[0]
+
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
+def get_emlak_rent_sold_price(bid):
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        cursor.execute(
+            "SELECT e.sold_price, e.rent_price,g.type_area FROM emlak_cost as e INNER JOIN game_area as g ON e.business_id = g.idgame_area and e.business_id = %s",
+            (bid,))
+        user = cursor.fetchall()
+        cursor.close()
+        cnx.close()
+        return user[0]
+
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
+def get_emlak_commission(bid):
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        cursor.execute(
+            "SELECT emlak_satis_komisyon, emlak_kiralama_komisyon FROM komisyon as k INNER JOIN game_area as g ON k.id_emlak = g.idgame_area and k.id_emlak = %s",
+            (bid,))
+        user = cursor.fetchall()
+        cursor.close()
+        cnx.close()
+        return user[0]
+
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
+def set_cost(uid, bid, salary, cost, sold, rent):
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        cursor.execute("select type_area from game_area where idgame_area=%s", (bid,))
+        btype = cursor.fetchall()
+        print('sa')
+        if btype[0][0] != '1':
+
+            print('1')
+            cursor.execute("""UPDATE show_coast SET cost=%s where id_owner=%s and id_shop_cost=%s""", (cost, uid, bid))
+            cursor.execute("""UPDATE business_salary SET salary=%s where owner_id=%s and idbusiness_salary=%s""",
+                           (salary, uid, bid))
+            cnx.commit()
+        else:
+            cursor.execute("""UPDATE business_salary SET salary=%s where owner_id=%s and idbusiness_salary=%s""",
+                           (salary, uid, bid))
+            cnx.commit()
+
+        cursor.execute("""UPDATE emlak_cost SET sold_price=%s, rent_price=%s where owner_id=%s and business_id=%s""",
+                       (sold, rent, uid, bid))
+        cnx.commit()
+        cursor.close()
+        cnx.close()
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
+def set_emlak_rent_sold_price(bid, sold_price, rent_price):
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        cursor.execute("""UPDATE emlak_cost SET sold_price=%s,rent_price=%s where business_id=%s """,
+                       (sold_price, rent_price, bid))
+        cnx.commit()
+        cursor.close()
+        cnx.close()
+
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
+def set_emlak_commission(sold_c, rent_c, bid, uid):
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        cursor.execute(
+            """UPDATE komisyon SET emlak_satis_komisyon=%s, emlak_kiralama_komisyon=%s where id_emlak=%s and id_user=%s""",
+            (sold_c, rent_c, bid, uid))
+        cnx.commit()
+        cursor.close()
+        cnx.close()
+
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+import datetime
+
+import mysql.connector
+
+
+class database:
+    pass
+
+
+def connecter():
+    cnx = mysql.connector.connect(user='root', password='18436572',
+                                  host='127.0.0.1',
+                                  database='prolab')
+    return cnx
+
+
+def register(name, surname, pasword):
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        cursor.execute("select *  from start where idstart=1")
+        starter_value = cursor.fetchall()
+
+        sql = "INSERT INTO users (name, surname, password, food, item, money, starting_time) VALUES (%s, %s, %s, %s, %s, %s, %s)"
+        val = (name, surname, pasword, starter_value[0][3], starter_value[0][1], starter_value[0][2],
+               datetime.datetime.today())
+
+        cursor.execute(sql, val)
+        cnx.commit()
+        cnx.close()
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
+def login(name, surname, pasword):
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        sql = "select * from users where not(id_user=1) and name=%s and  surname=%s and password=%s"
+        cursor.execute(sql, (name, surname, pasword))
+        starter_value = cursor.fetchall()
+        cursor.close()
+        cnx.close()
+        if starter_value == []:
+            return [starter_value, False]
+
+        return [starter_value[0], True]
+
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
+def manager_login(name, surname, pasword):
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        sql = "select * from users where id_user=1 and name=%s and  surname=%s and password=%s"
+        cursor.execute(sql, (name, surname, pasword))
+        starter_value = cursor.fetchall()
+        cnx.close()
+        if starter_value == []:
+            return [starter_value, False]
+        return [starter_value[0], True]
+
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
+def manager_upgrade_starter(item, money, food, area_size, shop_salary, item_salary, emlak_salary, food_price,
+                            item_price):
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        sql = "TRUNCATE TABLE game_area"
+        sql2 = "TRUNCATE TABLE show_coast"
+        sql3 = "TRUNCATE TABLE business_salary"
+        sql4 = "TRUNCATE TABLE business"
+        sql5 = "TRUNCATE TABLE emlak_cost"
+        sql6 = "TRUNCATE TABLE komisyon"
+        cursor.execute(sql)
+        cnx.commit()
+        cursor.execute(sql2)
+        cnx.commit()
+        cursor.execute(sql3)
+        cnx.commit()
+        cursor.execute(sql4)
+        cnx.commit()
+        cursor.execute(sql5)
+        cnx.commit()
+        cursor.execute(sql6)
+        cnx.commit()
+        cursor.execute("""
+           UPDATE start
+           SET start_item=%s, start_money=%s, start_food=%s, game_size=%s
+           where idstart=%s
+           
+        """, (item, money, food, str(area_size), 1))
+        cursor.execute(
+            "INSERT INTO komisyon (id_emlak, emlak_satis_komisyon, emlak_kiralama_komisyon, id_user) VALUES (%s, %s, %s, %s)",
+            (1, 0, 0, 1))
+
+        area = int(area_size[0]) * int(area_size[2])
+        cnx.commit()
+        for i in range(area):
+            sql = "INSERT INTO game_area (type_area, area_users_id) VALUES (%s, %s)"
+            sql2 = "INSERT INTO show_coast (id_shop_cost, cost, id_owner) VALUES (%s, %s, %s)"
+            sql3 = "INSERT INTO business_salary (idbusiness_salary, salary, owner_id) VALUES (%s, %s, %s)"
+            sql4 = "INSERT INTO business (idbusiness, level, capacity,total_worker,id_owner) VALUES (%s, %s, %s, %s, %s)"
+            sql5 = "INSERT INTO emlak_cost (sold_price, rent_price,owner_id,business_id) VALUES (%s, %s, %s, %s)"
+            if i == 0:
+                cursor.execute(sql, (1, 1))
+                cursor.execute(sql3, (i + 1, emlak_salary, 1))
+                cursor.execute(sql4, (i + 1, 3, 99, 0, 1))
+                cursor.execute(sql5, (9999, 9999, 1, i + 1))
+            elif i == 1:
+                cursor.execute(sql, (2, 1))
+                cursor.execute(sql2, (i + 1, food_price, 1))
+                cursor.execute(sql3, (i + 1, shop_salary, 1))
+                cursor.execute(sql4, (i + 1, 3, 99, 0, 1))
+                cursor.execute(sql5, (9999, 9999, 1, i + 1))
+            elif i == 2:
+                cursor.execute(sql, (3, 1))
+                cursor.execute(sql2, (i + 1, item_price, 1))
+                cursor.execute(sql3, (i + 1, item_salary, 1))
+                cursor.execute(sql4, (i + 1, 3, 99, 0, 1))
+                cursor.execute(sql5, (9999, 9999, 1, i + 1))
+            else:
+                cursor.execute(sql, (4, 1))
+                cursor.execute(sql5, (200, 9999, 1, i + 1))
+
+            cnx.commit()
+        cnx.close()
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
+def manager_upgrade_daily(item, money, food):
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        cursor.execute("""
+           UPDATE daily_coast
+           SET food=%s, money=%s, item=%s
+           where iddaily_coast=%s
+        """, (item, money, food, 1))
+        cnx.commit()
+        cnx.close()
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
+def manager_upgrade_build_cost(emlak, market, supermarket):
+    oran = [emlak, market, supermarket]
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        for i in range(3):
+            cursor.execute("""
+                       UPDATE type_business
+                       SET build_cost=%s
+                       where idtype_business=%s
+                    """, (oran[i], i + 1))
+
+        cnx.commit()
+        cnx.close()
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
+def manager_upgrade_level_cost(first, second, third):
+    oran = [first, second, third]
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        for i in range(3):
+            cursor.execute("""
+                       UPDATE business_level_oran
+                       SET oran=%s
+                       where id_busines=%s
+                    """, (oran[i], i + 1))
+
+        cnx.commit()
+        cnx.close()
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
+def buy_food_item(uid, buy_count, area_id):
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        cursor.execute(
+            "select c.cost, c.id_owner from game_area as g INNER JOIN show_coast as c ON g.idgame_area=%s and g.idgame_area=c.id_shop_cost",
+            (area_id[0],))
+        cost = cursor.fetchall()
+        cursor.execute("select food, item, money from users where id_user=%s", (uid,))
+        user_info = cursor.fetchall()
+
+        new_money = int(user_info[0][2]) - (int(buy_count) * int(cost[0][0]))
+        if area_id[1] == '2':
+            new_food = int(user_info[0][0]) + int(buy_count)
+            cursor.execute("""
+                      UPDATE users
+                      SET food=%s, money=%s
+                      where id_user=%s
+                   """, (new_food, new_money, uid))
+            cnx.commit()
+        elif area_id[1] == '3':
+            new_item = int(user_info[0][1]) + int(buy_count)
+            cursor.execute("""
+                      UPDATE users
+                      SET item=%s, money=%s
+                      where id_user=%s
+                   """, (new_item, new_money, uid))
+            cnx.commit()
+
+        cnx.close()
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
+"""------------------------------------ GET FUNCTİON ----------------------------------------------"""
+
+
+def getIMF(uid):
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        cursor.execute("select food,item,money from users where id_user=%s", (uid,))
+        starter_value = cursor.fetchall()
+        cnx.close()
+        return starter_value[0]
+    except mysql.connector.Error as error:
+        print("err: {}".format(error))
+        return 1
+
+
+def get_game_area():
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        cursor.execute("select game_size from start where idstart=1")
+        starter_value = cursor.fetchall()
+        cursor.close()
+        cnx.close()
+        if starter_value == []:
+            return [starter_value, False]
+
+        return [starter_value[0][0][0], starter_value[0][0][2], True]
+
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
+def get_area_type(aid):
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        cursor.execute("select * from game_area where idgame_area=%s", (aid,))
+        starter_value = cursor.fetchall()
+        cursor.close()
+        cnx.close()
+        if starter_value == []:
+            return [starter_value, False]
+
+        return [starter_value[0], True]
+
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
+def get_area_owner_tooltip(aid):
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        cursor.execute("select * from game_area where idgame_area=%s", (aid,))
+        starter_value = cursor.fetchall()
+        cursor.execute("select name, surname from users where id_user=%s", (starter_value[0][2],))
+        user = cursor.fetchall()
+        user = "owner by: " + user[0][0] + " " + user[0][1]
+        cursor.close()
+        cnx.close()
+        return user
+
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
+def get_area_owner(bid):
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        cursor.execute("select * from game_area where idgame_area=%s", (bid,))
+        starter_value = cursor.fetchall()
+        cursor.execute("select name, surname from users where id_user=%s", (starter_value[0][2],))
+        user = cursor.fetchall()
+        user = user[0][0] + " " + user[0][1]
+        cursor.close()
+        cnx.close()
+        return user
+
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
+def get_shop_price(bid):
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        cursor.execute(
+            "SELECT c.cost FROM game_area as g INNER JOIN show_coast as c ON g.idgame_area=%s and c.id_owner=g.area_users_id and g.idgame_area=c.id_shop_cost",
+            (bid,))
+        cost = cursor.fetchall()
+        cursor.close()
+        cnx.close()
+        return cost[0]
+
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
+def get_shop_salary(bid):
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        cursor.execute(
+            "SELECT s.salary FROM game_area as g INNER JOIN business_salary as s ON g.idgame_area=%s and s.owner_id = g.area_users_id and g.idgame_area=s.idbusiness_salary",
+            (bid,))
+        salary = cursor.fetchall()
+        cursor.close()
+        cnx.close()
+        return salary[0]
+
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
+def get_sold_business(bid):
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        cursor.execute(
+            "SELECT e.sold_price FROM game_area as g INNER JOIN emlak_cost as e ON g.idgame_area=%s and e.owner_id = g.area_users_id and g.idgame_area=e.business_id",
+            (bid,))
+        sold_price = cursor.fetchall()
+        cursor.close()
+        cnx.close()
+        return sold_price[0]
+
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
+def get_all_property():
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        cursor.execute(
+            "SELECT u.id_user, u.name, u.surname, g.idgame_area,t.type FROM game_area as g INNER JOIN users as u ON u.id_user=g.area_users_id INNER JOIN type_business as t ON g.type_area = t.idtype_business")
+        starter_value = cursor.fetchall()
+        cursor.close()
+        cnx.close()
+        return starter_value
+
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
+def get_area(uid):
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        cursor.execute(
+            "SELECT b.idbusiness_salary,t.type,salary,u.id_user,u.name,u.surname FROM business_salary as b INNER JOIN game_area as g ON  g.idgame_area = b.idbusiness_salary INNER JOIN type_business as t ON t.idtype_business=g.type_area INNER JOIN users as u ON u.id_user=b.owner_id where NOT(b.owner_id=%s)",
+            (uid,))
+        user = cursor.fetchall()
+        cursor.close()
+        cnx.close()
+        return user
+
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
+def get_build_business_price(type_business):
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        cursor.execute(
+            "SELECT build_cost FROM type_business where type=%s",
+            (type_business,))
+        type_business_cost = cursor.fetchall()
+        cursor.close()
+        cnx.close()
+        return type_business_cost[0][0]
+
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
+def get_owner_land(uid):
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        cursor.execute(
+            "SELECT * FROM game_area where area_users_id=%s and type_area=4",
+            (uid,))
+        user = cursor.fetchall()
+        cursor.close()
+        cnx.close()
+        return user
+
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
+"---------------------------------------SET FUNCTİON-----------------------------------------------"
+
+
+def set_find_job(bid, uid):
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        cursor.execute("""
+           UPDATE users
+           SET job_id=%s
+           where id_user=%s
+        """, (bid, uid[0]))
+        cursor.execute("""
+                   INSERT INTO busines_start
+                   (idbusines_start, worker_id, starting_time) VALUES (%s, %s, %s)
+                """, (bid, uid[0], datetime.datetime.today()))
+        cnx.commit()
+        cnx.close()
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
+def set_rent_sold(bid, rent_or_sold, uid, days=0, emlak_id=-1, owner=-1):
+    if rent_or_sold == 'sold':
+        try:
+            cnx = connecter()
+            cursor = cnx.cursor()
+            cursor.execute("SELECT type_area FROM game_area where idgame_area=%s", (bid,))
+            b_type = cursor.fetchall()
+            if b_type[0][0] == '4':
+                cursor.execute(
+                    "SELECT u.money, t.idtype_business, k.emlak_satis_komisyon, e.sold_price, u.id_user FROM game_area as g INNER JOIN emlak_cost as e ON  g.idgame_area = %s and e.idemlak_cost = g.idgame_area INNER JOIN komisyon as k ON k.id_emlak=%s INNER JOIN type_business as t ON t.idtype_business=g.type_area INNER JOIN users as u ON u.id_user = %s",
+                    (bid, emlak_id, uid))
+                sold_info = cursor.fetchall()
+                sold_info = sold_info[0]
+                cursor.execute(
+                    "SELECT u.id_user,u.money FROM game_area as g INNER JOIN users as u ON g.idgame_area=%s and g.area_users_id=u.id_user ",
+                    (emlak_id,))
+                emlak_info = cursor.fetchall()
+                emlak_info = emlak_info[0]
+                cursor.execute(
+                    "SELECT u.id_user,u.money FROM game_area as g INNER JOIN users as u ON g.area_users_id=u.id_user and g.idgame_area=%s",
+                    (bid,))
+                owner_id = cursor.fetchall()
+                owner_id = owner_id[0]
+                print(sold_info)
+                print(emlak_info)
+                print(owner_id)
+                if int(sold_info[0]) < int(sold_info[3]):
+                    return False
+                else:
+                    new_money = int(int(sold_info[0]) - int(sold_info[3]))
+                    cursor.execute("""
+                        UPDATE users
+                        SET money=%s
+                        where id_user=%s
+                        """, (new_money, uid))
+                    cnx.commit()
+                    cursor.execute(
+                        "SELECT u.id_user,u.money FROM game_area as g INNER JOIN users as u ON g.idgame_area=%s and g.area_users_id=u.id_user ",
+                        (emlak_id,))
+                    emlak_money = cursor.fetchall()
+                    emlak_money = emlak_money[0]
+
+                    cursor.execute("""
+                        UPDATE emlak_cost
+                        SET owner_id=%s
+                        where idemlak_cost=%s
+                        """, (uid, bid))
+
+                    cursor.execute("""
+                        UPDATE game_area
+                        SET area_users_id=%s
+                        where idgame_area=%s
+                        """, (uid, bid))
+                    commition = int(emlak_money[1]) + int((int(sold_info[3]) * int(sold_info[2])) / 100)
+                    cursor.execute("""
+                        UPDATE users
+                        SET money=%s
+                        where id_user=%s
+                        """, (commition, emlak_info[0]))
+
+                    if owner_id[0] == emlak_info[0]:
+                        owner_money = (int(sold_info[3]) + int(owner_id[1]))
+                    else:
+                        owner_money = (int(sold_info[3]) + int(owner_id[1])) - (
+                            int((int(sold_info[3]) * int(sold_info[2])) / 100))
+
+                    cursor.execute("""
+                        UPDATE users
+                        SET money=%s
+                        where id_user=%s
+                        """, (owner_money, owner_id[0]))
+                    cursor.execute(
+                        """INSERT INTO sold (id_emlak, id_owner, id_user, id_busines, date) VALUES (%s, %s, %s, %s, %s)""",
+                        (emlak_id, owner_id[0], sold_info[4], bid, datetime.datetime.today()))
+                cnx.commit()
+            else:
+                cursor.execute(
+                    "SELECT u.money, t.idtype_business, k.emlak_satis_komisyon, e.sold_price, u.id_user FROM game_area as g INNER JOIN emlak_cost as e ON  g.idgame_area = %s and e.idemlak_cost = g.idgame_area INNER JOIN komisyon as k ON k.id_emlak=%s INNER JOIN type_business as t ON t.idtype_business=g.type_area INNER JOIN users as u ON u.id_user = %s",
+                    (bid, emlak_id, uid))
+                sold_info = cursor.fetchall()
+                sold_info = sold_info[0]
+                cursor.execute(
+                    "SELECT u.id_user,u.money FROM game_area as g INNER JOIN users as u ON g.idgame_area=%s and g.area_users_id=u.id_user ",
+                    (emlak_id,))
+                emlak_info = cursor.fetchall()
+                emlak_info = emlak_info[0]
+                cursor.execute(
+                    "SELECT u.id_user,u.money FROM game_area as g INNER JOIN users as u ON g.area_users_id=u.id_user and g.idgame_area=%s",
+                    (bid,))
+                owner_id = cursor.fetchall()
+                owner_id = owner_id[0]
+                if int(sold_info[0]) < int(sold_info[3]):
+                    return False
+                else:
+                    new_money = int(int(sold_info[0]) - int(sold_info[3]))
+                    cursor.execute("""
+                                       UPDATE users
+                                       SET money=%s
+                                       where id_user=%s
+                                       """, (new_money, uid))
+                    cnx.commit()
+                    cursor.execute(
+                        "SELECT u.id_user,u.money FROM game_area as g INNER JOIN users as u ON g.idgame_area=%s and g.area_users_id=u.id_user ",
+                        (emlak_id,))
+                    emlak_money = cursor.fetchall()
+                    emlak_money = emlak_money[0]
+
+                    cursor.execute("""
+                                       UPDATE emlak_cost
+                                       SET owner_id=%s
+                                       where idemlak_cost=%s
+                                       """, (uid, bid))
+
+                    cursor.execute("""
+                                       UPDATE game_area
+                                       SET area_users_id=%s
+                                       where idgame_area=%s
+                                       """, (uid, bid))
+                    commition = int(emlak_money[1]) + int((int(sold_info[3]) * int(sold_info[2])) / 100)
+                    cursor.execute("""
+                                       UPDATE users
+                                       SET money=%s
+                                       where id_user=%s
+                                       """, (commition, emlak_info[0]))
+                    cursor.execute("""
+                                       UPDATE show_coast
+                                       SET id_owner=%s
+                                       where id_shop_cost=%s
+                                       """, (uid, bid))
+                    cursor.execute("""
+                                       UPDATE business_salary
+                                       SET owner_id=%s
+                                       where idbusiness_salary=%s
+                                       """, (uid, bid))
+                    cursor.execute("""
+                                       UPDATE business
+                                       SET id_owner=%s
+                                       where idbusiness=%s
+                                       """, (uid, bid))
+                    if owner_id[0] == emlak_info[0]:
+                        owner_money = (int(sold_info[3]) + int(owner_id[1]))
+                    else:
+                        owner_money = (int(sold_info[3]) + int(owner_id[1])) - (
+                            int((int(sold_info[3]) * int(sold_info[2])) / 100))
+
+                    cursor.execute("""
+                                       UPDATE users
+                                       SET money=%s
+                                       where id_user=%s
+                                       """, (owner_money, owner_id[0]))
+                    cursor.execute(
+                        """INSERT INTO sold (id_emlak, id_owner, id_user, id_busines, date) VALUES (%s, %s, %s, %s, %s)""",
+                        (emlak_id, owner_id[0], sold_info[4], bid, datetime.datetime.today()))
+                    if b_type[0][0] == '1':
+                        cursor.execute("""
+                                       UPDATE komisyon
+                                       SET id_user=%s
+                                       where id_emlak=%s
+                                       """, (uid, bid))
+                cnx.commit()
+            cnx.close()
+        except mysql.connector.Error as error:
+            print("Failed to insert into MySQL table {}".format(error))
+
+    elif rent_or_sold == 'rent':
+        try:
+            start_day = datetime.date.today()
+            finish_day = datetime.date.today() + datetime.timedelta(days=int(days))
+            cnx = connecter()
+            cursor = cnx.cursor()
+            cursor.execute("""
+                       INSERT INTO rent
+                       (rent_time, rent_date, rent_finish_date, id_emlak, id_user, id_business, id_owner) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """, (days, start_day, finish_day, emlak_id, uid, bid, owner))
+            cnx.commit()
+            cursor.close()
+            cnx.close()
+
+
+        except mysql.connector.Error as error:
+            print("Failed to insert into MySQL table {}".format(error))
+
+
+def set_emlak_rent_sold_price(bid, sold_price, rent_price):
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        cursor.execute("""UPDATE emlak_cost SET sold_price=%s,rent_price=%s where business_id=%s """,
+                       (sold_price, rent_price, bid))
+        cnx.commit()
+        cursor.close()
+        cnx.close()
+
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
+def set_build_business(uid, bid, emlak_id, type_business, b_cost):
+    try:
+        cnx = connecter()
+        cursor = cnx.cursor()
+        cursor.execute("SELECT money FROM users where id_user=%s", (uid,))
+        u_money = cursor.fetchall()
+
+        if int(u_money[0][0]) < int(b_cost):
+            return None
+        else:
+            u_money = int(u_money[0][0]) - int(b_cost)
+            cursor.execute("""
+                    UPDATE users
+                    SET money=%s
+                    where id_user=%s
+                    """, (u_money, uid))
+            cursor.execute(
+                "INSERT INTO business_salary (idbusiness_salary, salary, owner_id, business_level_oran) VALUES (%s, %s, %s, %s)",
+                (bid, 0, uid, 1))
+            cursor.execute(
+                "INSERT INTO business (idbusiness, level, capacity, total_worker, id_owner) VALUES (%s, %s, %s, %s, %s)",
+                (bid, 1, 3, 0, uid))
+            cursor.execute(
+                "INSERT INTO sold (id_emlak, id_owner, id_user, id_busines, date) VALUES (%s, %s, %s, %s, %s)",
+                (emlak_id, uid, uid, bid, datetime.datetime.today()))
+            cursor.execute(
+                "SELECT idtype_business FROM type_business where type=%s",
+                (type_business,))
+            type_business = cursor.fetchall()
+
+            cursor.execute("""
+                    UPDATE game_area
+                    SET type_area=%s
+                    where idgame_area=%s
+                    """, (type_business[0][0], bid))
+            cnx.commit()
+            if type_business[0][0] != 1:
+                cursor.execute(
+                    "INSERT INTO show_coast (id_shop_cost, cost, id_owner) VALUES (%s, %s, %s)",
+                    (bid, 0, uid))
+            else:
+                cursor.execute(
+                    "INSERT INTO komisyon (id_emlak, emlak_satis_komisyon, emlak_kiralama_komisyon,id_user) VALUES (%s, %s, %s, %s)",
+                    (bid, 1, 1, uid))
+            cnx.commit()
+        cursor.close()
+        cnx.close()
+
+
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+
+
